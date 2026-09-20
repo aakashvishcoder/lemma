@@ -3,7 +3,7 @@ import { prisma } from '../db/client';
 import { isRoomMember } from '../services/roomService';
 
 export async function requireDocumentRoomMembership(req: Request, res: Response, next: NextFunction) {
-  const document = await prisma.document.findUnique({ where: { id: req.params.id } });
+  const document = await prisma.document.findUnique({ where: { id: req.params.id as string } });
   if (!document) {
     return res.status(404).json({ error: 'Document not found' });
   }

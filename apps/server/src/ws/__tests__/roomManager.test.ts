@@ -7,12 +7,15 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { attachWebSocketServer } from '../index';
+import { prisma } from '../../db/client';
+import { createRoom, joinRoomByInviteCode } from '../../services/roomService';
+import { registerUser, signToken } from '../../services/authService';
 
 const MESSAGE_SYNC = 0;
 
-function connectTestClient(port: number, roomId: string, doc: Y.Doc): Promise<WebSocket> {
+function connectTestClient(port: number, roomId: string, token: string, doc: Y.Doc): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://localhost:${port}?roomId=${roomId}`);
+    const ws = new WebSocket(`ws://localhost:${port}?roomId=${roomId}&token=${token}`);
 
     ws.on('message', (data: Buffer) => {
       const decoder = decoding.createDecoder(new Uint8Array(data));
@@ -41,43 +44,72 @@ function connectTestClient(port: number, roomId: string, doc: Y.Doc): Promise<We
 describe('room sync over real WebSocket connections', () => {
   let port: number;
   let httpServer: ReturnType<typeof createServer>;
+  let roomId: string;
+  const userIds: string[] = [];
+  const tokens: string[] = [];
 
   beforeAll(async () => {
     httpServer = createServer();
     attachWebSocketServer(httpServer);
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
     port = (httpServer.address() as AddressInfo).port;
+
+    const suffix = Date.now();
+    const owner = await registerUser(`ws-owner-${suffix}@example.com`, 'password123', 'Owner');
+    const room = await createRoom(owner.id, 'WS Test Room');
+    roomId = room.id;
+    userIds.push(owner.id);
+    tokens.push(signToken(owner.id));
+
+    for (let i = 0; i < 2; i++) {
+      const member = await registerUser(`ws-member-${i}-${suffix}@example.com`, 'password123', `Member ${i}`);
+      await joinRoomByInviteCode(member.id, room.inviteCode);
+      userIds.push(member.id);
+      tokens.push(signToken(member.id));
+    }
   });
 
   afterAll(async () => {
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    await prisma.roomMember.deleteMany({ where: { roomId } });
+    await prisma.room.delete({ where: { id: roomId } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 
   it('converges 3 concurrent clients editing the same room', async () => {
-    const roomId = `test-room-${Date.now()}`;
     const docA = new Y.Doc();
     const docB = new Y.Doc();
     const docC = new Y.Doc();
 
     const [wsA, wsB, wsC] = await Promise.all([
-      connectTestClient(port, roomId, docA),
-      connectTestClient(port, roomId, docB),
-      connectTestClient(port, roomId, docC),
+      connectTestClient(port, roomId, tokens[0], docA),
+      connectTestClient(port, roomId, tokens[1], docB),
+      connectTestClient(port, roomId, tokens[2], docC),
     ]);
 
-    // Deliberately concurrent: both insert at index 0 before seeing
-    // each other's edit, same kind of tie the CRDT convergence test covers.
-    docA.getText('content').insert(0, 'from A');
-    docB.getText('content').insert(0, 'from B');
+    try {
+      docA.getText('content').insert(0, 'from A');
+      docB.getText('content').insert(0, 'from B');
 
-    await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
 
-    const finalText = docA.getText('content').toString();
-    expect(docB.getText('content').toString()).toBe(finalText);
-    expect(docC.getText('content').toString()).toBe(finalText);
+      const finalText = docA.getText('content').toString();
+      expect(docB.getText('content').toString()).toBe(finalText);
+      expect(docC.getText('content').toString()).toBe(finalText);
+    } finally {
+      wsA.close();
+      wsB.close();
+      wsC.close();
+    }
+  });
 
-    wsA.close();
-    wsB.close();
-    wsC.close();
+  it('rejects a connection with no token', async () => {
+    await expect(
+      new Promise((resolve, reject) => {
+        const ws = new WebSocket(`ws://localhost:${port}?roomId=${roomId}`);
+        ws.on('open', () => reject(new Error('connection should not have opened')));
+        ws.on('error', resolve);
+      }),
+    ).resolves.toBeInstanceOf(Error);
   });
 });
