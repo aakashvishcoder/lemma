@@ -3,8 +3,26 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import type {WebSocket} from 'ws';
+import { redisPub, redisSub } from '../redis/client';
 
 const MESSAGE_SYNC = 0;
+const REDIS_ORIGIN= Symbol('redis');
+const CHANNEL_PREFIX = 'room:';
+const CHANNEL_SUFFIX = ":updates";
+
+function channelForRoom(roomId: string): string {
+  return `${CHANNEL_PREFIX}${roomId}${CHANNEL_SUFFIX}`;
+}
+
+redisSub.psubscribe(`${CHANNEL_PREFIX}*${CHANNEL_SUFFIX}`);
+redisSub.on('pmessageBuffer', (_pattern: string, channel: Buffer, message: Buffer) => {
+  const channelStr = channel.toString();
+  const roomId = channelStr.slice(CHANNEL_PREFIX.length, -CHANNEL_SUFFIX.length);
+  const room = rooms.get(roomId);
+  if (room) {
+    Y.applyUpdate(room.doc, new Uint8Array(message), REDIS_ORIGIN);
+  }
+}); 
 
 interface Room {
     doc: Y.Doc,
@@ -20,16 +38,20 @@ function getRoom(roomId: string): Room {
     room = { doc, sockets: new Set()};
     rooms.set(roomId, room);
 
-    doc.on('update', (update: Uint8Array, origin: WebSocket | null) => {
+    doc.on('update', (update: Uint8Array, origin: unknown) => {
         const encoder = encoding.createEncoder();
         encoding.writeVarUint(encoder, MESSAGE_SYNC);
         syncProtocol.writeUpdate(encoder, update);
-        const message =encoding.toUint8Array(encoder);
+        const message = encoding.toUint8Array(encoder);
 
-        for(const ws of room!.sockets) {
-            if(ws !== origin && ws.readyState=== ws.OPEN) {
-                ws.send(message);
+        for (const ws of room!.sockets) {
+            if (ws !== origin && ws.readyState === ws.OPEN) {
+            ws.send(message);
             }
+        }
+
+        if (origin !== REDIS_ORIGIN) {
+            redisPub.publish(channelForRoom(roomId), Buffer.from(update));
         }
     });
 

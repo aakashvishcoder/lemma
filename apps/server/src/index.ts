@@ -3,6 +3,7 @@ import { app } from './app';
 import { attachWebSocketServer } from './ws';
 
 const server = createServer(app);
+const PORT = Number(process.env.PORT ?? 3001);
 attachWebSocketServer(server);
 
-server.listen(3001, () => console.log('server listening on :3001'));
+server.listen(PORT, () => console.log(`server listening on :${PORT}`));
