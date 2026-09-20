@@ -39,9 +39,11 @@ describe('documents routes', () => {
       });
     token = registerRes.body.token;
     userId = (jwt.decode(token) as { sub: string }).sub;
+    await prisma.roomMember.create({ data: { roomId: room.id, userId, role: 'owner' } });
   });
 
   afterAll(async () => {
+    await prisma.roomMember.delete({ where: { roomId_userId: { roomId, userId } } });
     await prisma.document.delete({ where: { id: documentId } });
     await prisma.room.delete({ where: { id: roomId } });
     await prisma.user.delete({ where: { id: userId } });
