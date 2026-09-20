@@ -13,6 +13,28 @@ import { registerUser, signToken } from '../../services/authService';
 
 const MESSAGE_SYNC = 0;
 
+function waitForContent(doc: Y.Doc, predicate: (text: string) => boolean, timeoutMs = 5000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const text = doc.getText('content').toString();
+      if (predicate(text)) {
+        cleanup();
+        resolve(text);
+      }
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timed out waiting for content. Last seen: ${JSON.stringify(doc.getText('content').toString())}`));
+    }, timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timer);
+      doc.off('update', check);
+    };
+    doc.on('update', check);
+    check();
+  });
+}
+
 function connectTestClient(port: number, roomId: string, token: string, doc: Y.Doc): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${port}?roomId=${roomId}&token=${token}`);
@@ -91,7 +113,12 @@ describe('room sync over real WebSocket connections', () => {
       docA.getText('content').insert(0, 'from A');
       docB.getText('content').insert(0, 'from B');
 
-      await new Promise((r) => setTimeout(r, 300));
+      const hasBothEdits = (text: string) => text.includes('from A') && text.includes('from B');
+      await Promise.all([
+        waitForContent(docA, hasBothEdits),
+        waitForContent(docB, hasBothEdits),
+        waitForContent(docC, hasBothEdits),
+      ]);
 
       const finalText = docA.getText('content').toString();
       expect(docB.getText('content').toString()).toBe(finalText);
