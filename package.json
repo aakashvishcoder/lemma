@@ -13,9 +13,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "dependencies": {
-    "yjs": "^13.6.27",
+    "y-monaco": "^0.1.6",
     "y-protocols": "^1.0.6",
-    "y-monaco": "^0.1.6"
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
