@@ -9,13 +9,13 @@ const DEMO_INVITE_CODE = 'demo-room';
 const API_BASE = 'http://localhost:3001';
 
 function CollabEditor({ roomId, token }: { roomId: string; token: string }) {
-  const doc = useCollabDoc(roomId, token);
+  const { doc, awareness } = useCollabDoc(roomId, token);
   const bindingRef = useRef<MonacoBinding | null>(null);
 
   const handleMount: OnMount = (editor) => {
     const model = editor.getModel();
     if (!model) return;
-    bindingRef.current = new MonacoBinding(doc.getText('content'), model, new Set([editor]));
+    bindingRef.current = new MonacoBinding(doc.getText('content'), model, new Set([editor]), awareness);
   };
 
   useEffect(() => {
