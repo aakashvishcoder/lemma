@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime     @default(now())
+  memberships  RoomMember[]
+}
+
+model Room {
+  id         String       @id @default(uuid())
+  name       String
+  ownerId    String
+  isPublic   Boolean      @default(false)
+  inviteCode String       @unique
+  createdAt  DateTime     @default(now())
+  members    RoomMember[]
+  documents  Document[]
+}
+
+model RoomMember {
+  id       String   @id @default(uuid())
+  roomId   String
+  userId   String
+  role     String   @default("editor")
+  joinedAt DateTime @default(now())
+  room     Room     @relation(fields: [roomId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([roomId, userId])
+}
+
+model Document {
+  id          String       @id @default(uuid())
+  roomId      String
+  filename    String
+  language    String       @default("typescript")
+  snapshot    Bytes
+  snapshotSeq Int          @default(0)
+  updatedAt   DateTime     @updatedAt
+  room        Room         @relation(fields: [roomId], references: [id])
+  ops         DocumentOp[]
+}
+
+model DocumentOp {
+  id         String   @id @default(uuid())
+  documentId String
+  seq        Int
+  op         Bytes
+  createdAt  DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id])
+}
