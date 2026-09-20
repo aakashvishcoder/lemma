@@ -5,8 +5,6 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "rootDir": "src"
-  },
-  "include": ["src"]
+    "skipLibCheck": true
+  }
 }
