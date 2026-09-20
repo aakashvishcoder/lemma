@@ -39,6 +39,16 @@ function connectTestClient(port: number, roomId: string, token: string, doc: Y.D
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${port}?roomId=${roomId}&token=${token}`);
 
+    ws.on('open', () => {
+      // The client must initiate with its own SyncStep1 so the server can
+      // reply with SyncStep2 containing the room's existing content - see
+      // the identical comment in apps/web/src/editor/yjsProvider.ts.
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, MESSAGE_SYNC);
+      syncProtocol.writeSyncStep1(encoder, doc);
+      ws.send(encoding.toUint8Array(encoder));
+    });
+
     ws.on('message', (data: Buffer) => {
       const decoder = decoding.createDecoder(new Uint8Array(data));
       const messageType = decoding.readVarUint(decoder);
@@ -127,6 +137,35 @@ describe('room sync over real WebSocket connections', () => {
       wsA.close();
       wsB.close();
       wsC.close();
+    }
+  });
+
+  it('a client joining after content already exists receives it', async () => {
+    const freshRoom = await createRoom(userIds[0], 'Fresh Room For Pre-existing Content Test');
+    await joinRoomByInviteCode(userIds[1], freshRoom.inviteCode);
+
+    try {
+      const docA = new Y.Doc();
+      const wsA = await connectTestClient(port, freshRoom.id, tokens[0], docA);
+
+      try {
+        docA.getText('content').insert(0, 'pre-existing content');
+        await waitForContent(docA, (t) => t === 'pre-existing content');
+
+        const docB = new Y.Doc();
+        const wsB = await connectTestClient(port, freshRoom.id, tokens[1], docB);
+        try {
+          const received = await waitForContent(docB, (t) => t === 'pre-existing content');
+          expect(received).toBe('pre-existing content');
+        } finally {
+          wsB.close();
+        }
+      } finally {
+        wsA.close();
+      }
+    } finally {
+      await prisma.roomMember.deleteMany({ where: { roomId: freshRoom.id } });
+      await prisma.room.delete({ where: { id: freshRoom.id } });
     }
   });
 
