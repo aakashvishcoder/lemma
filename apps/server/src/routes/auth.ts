@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Prisma } from '../generated/prisma/client';
 import { registerUser, loginUser, signToken } from '../services/authService';
+import { prisma } from '../db/client';
+import { requireAuth } from '../middleware/auth';
 
 export const authRouter = Router();
 
@@ -42,4 +44,9 @@ authRouter.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
   res.json({ token: signToken(user.id) });
+});
+
+authRouter.get('/me', requireAuth, async (req, res) => {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.userId } });
+  res.json({ id: user.id, email: user.email, displayName: user.displayName });
 });
