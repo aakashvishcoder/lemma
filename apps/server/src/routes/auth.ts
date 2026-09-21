@@ -4,6 +4,7 @@ import { Prisma } from '../generated/prisma/client';
 import { registerUser, loginUser, signToken } from '../services/authService';
 import { prisma } from '../db/client';
 import { requireAuth } from '../middleware/auth';
+import { authRateLimit } from '../middleware/rateLimit';
 
 export const authRouter = Router();
 
@@ -13,7 +14,7 @@ const registerSchema = z.object({
   displayName: z.string().min(1),
 });
 
-authRouter.post('/register', async (req, res) => {
+authRouter.post('/register', authRateLimit, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -34,7 +35,7 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-authRouter.post('/login', async (req, res) => {
+authRouter.post('/login', authRateLimit, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
