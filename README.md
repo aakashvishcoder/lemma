@@ -80,7 +80,11 @@ To try the multi-server setup, start a second copy with `PORT=3002 npm run dev -
 
 ## Running code
 
-The Run button sends the code to the server, which checks the language against an allowlist, rate limits it (60 runs a minute per person, backed by Redis) and forwards it to a [Piston](https://github.com/engineer-man/piston) container. Piston isolates each run, kills it after 3 seconds and caps its memory. Supported: Python, JavaScript, TypeScript, C++, Java, Go, Rust, C#, Ruby and PHP.
+JavaScript and Python run in the visitor's own browser, in a Web Worker (Python through [Pyodide](https://pyodide.org)). That means they work on the deployed site with no server-side sandbox. A run is killed after 3 seconds, and the worker can't touch the page or its storage. Input reaches the program as stdin, so `input()` in Python and `require('fs').readFileSync(0)` or `readline` in JavaScript both work.
+
+Everything else (TypeScript, C++, Java, Go, Rust, C#, Ruby, PHP) goes to the server. It checks the language against an allowlist, rate limits it (60 runs a minute per person, backed by Redis) and forwards it to a [Piston](https://github.com/engineer-man/piston) container, which isolates each run, kills it after 3 seconds and caps its memory.
+
+The Tests button opens a panel of test cases shared by everyone in the room. Each case has an input and an expected output, and Run all reports passed, wrong answer or error for each one.
 
 ## Deploying it
 
@@ -131,7 +135,7 @@ I'd rather list these than have you find them.
 - **Room contents live in server memory.** There's a REST endpoint that loads and saves a document in Postgres, but the live editor doesn't use it, and the WebSocket path doesn't write to Postgres at all. If every person leaves a room, or the server restarts, the text is gone. A new server also can't catch up on a room it hasn't seen, only on changes made after it joins.
 - **Everyone lands in one shared room.** The API supports creating rooms and joining by invite code, but the UI doesn't have a room picker.
 - **The free hosting tier sleeps.** After about 15 minutes with no traffic the server spins down, and since room text only lives in memory, it's gone when that happens.
-- **Run only works where there's a runner.** Code executes in a self-hosted Piston container, which needs privileged mode. Render's free tier can't host that, so on the deployed site the Run button reports the runner as unavailable. Output is also only shown to the person who pressed Run, and programs can't read input.
+- **Only JavaScript and Python run on the deployed site.** The other languages need the Piston container, which needs privileged mode, and Render's free tier can't host that. They work locally with Docker, or on any small VPS you point `RUNNER_URL` at. Output is only shown to the person who pressed Run.
 
 ## Built with
 
