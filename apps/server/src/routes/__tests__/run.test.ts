@@ -27,6 +27,16 @@ describe('POST /api/run', () => {
     expect(res.body).toEqual({ output: 'hi\n', exitCode: 0, timedOut: false, compileError: false });
   });
 
+  it('passes stdin through to the runner', async () => {
+    let sent: { stdin?: string } = {};
+    vi.stubGlobal('fetch', async (_url: string, init: { body: string }) => {
+      sent = JSON.parse(init.body);
+      return Response.json({ run: { stdout: '', stderr: '', output: '', code: 0, signal: null } });
+    });
+    await post({ language: 'python', code: 'input()', stdin: '3 4\n' });
+    expect(sent.stdin).toBe('3 4\n');
+  });
+
   it('reports compile errors instead of run output', async () => {
     vi.stubGlobal('fetch', async () =>
       Response.json({

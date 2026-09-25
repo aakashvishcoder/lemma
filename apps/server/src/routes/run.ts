@@ -10,6 +10,7 @@ const RUNNABLE = ['python', 'javascript', 'typescript', 'cpp', 'java', 'go', 'ru
 const runSchema = z.object({
   language: z.enum(RUNNABLE),
   code: z.string().max(100_000),
+  stdin: z.string().max(100_000).optional(),
 });
 
 const MAX_OUTPUT = 20_000;
@@ -31,6 +32,7 @@ runRouter.post('/', runRateLimit, async (req, res) => {
         language: parsed.data.language,
         version: '*',
         files: [{ content: parsed.data.code }],
+        stdin: parsed.data.stdin ?? '',
         compile_timeout: 10_000,
         run_timeout: 3_000,
         run_memory_limit: 256 * 1024 * 1024,

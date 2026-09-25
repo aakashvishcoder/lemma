@@ -20,4 +20,4 @@ function limiter(windowMs: number, limit: number, message: string, prefix: strin
 }
 
 export const authRateLimit = limiter(15 * 60 * 1000, 10, 'Too many attempts, please try again later', 'rl:auth:');
-export const runRateLimit = limiter(60 * 1000, 20, 'Too many runs, wait a moment', 'rl:run:');
+export const runRateLimit = limiter(60 * 1000, 60, 'Too many runs, wait a moment', 'rl:run:');

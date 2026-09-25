@@ -80,7 +80,7 @@ To try the multi-server setup, start a second copy with `PORT=3002 npm run dev -
 
 ## Running code
 
-The Run button sends the code to the server, which checks the language against an allowlist, rate limits it (20 runs a minute per person, backed by Redis) and forwards it to a [Piston](https://github.com/engineer-man/piston) container. Piston isolates each run, kills it after 3 seconds and caps its memory. Supported: Python, JavaScript, TypeScript, C++, Java, Go, Rust, C#, Ruby and PHP.
+The Run button sends the code to the server, which checks the language against an allowlist, rate limits it (60 runs a minute per person, backed by Redis) and forwards it to a [Piston](https://github.com/engineer-man/piston) container. Piston isolates each run, kills it after 3 seconds and caps its memory. Supported: Python, JavaScript, TypeScript, C++, Java, Go, Rust, C#, Ruby and PHP.
 
 ## Deploying it
 

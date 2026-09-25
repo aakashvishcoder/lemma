@@ -6,6 +6,8 @@ import type { Awareness } from 'y-protocols/awareness';
 import { useCollabDoc } from './editor/useCollabDoc';
 import { API_BASE } from './config';
 import { Mark } from './ui/Mark';
+import { TestsPanel } from './TestsPanel';
+import { RUNNABLE, runCode, type RunResult } from './editor/run';
 
 const DEMO_INVITE_CODE = 'demo-room';
 const LANGUAGES = [
@@ -24,7 +26,6 @@ const LANGUAGES = [
   { id: 'css', label: 'CSS', ext: 'css' },
   { id: 'json', label: 'JSON', ext: 'json' },
 ];
-const RUNNABLE = new Set(['python', 'javascript', 'typescript', 'cpp', 'java', 'go', 'rust', 'csharp', 'ruby', 'php']);
 const COLORS = ['#ff7a8a', '#4fdcf7', '#ffcb5c', '#62f0b8'];
 
 interface Me {
@@ -115,35 +116,13 @@ function useSharedLanguage(doc: Y.Doc) {
   return language;
 }
 
-interface RunResult {
-  output: string;
-  exitCode: number | null;
-  timedOut: boolean;
-  compileError: boolean;
-  failure?: string;
-}
-
-async function runCode(token: string, language: string, code: string): Promise<RunResult> {
-  try {
-    const res = await fetch(`${API_BASE}/api/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ language, code }),
-    });
-    const body = await res.json();
-    if (!res.ok) return { output: '', exitCode: null, timedOut: false, compileError: false, failure: body.error ?? 'Run failed' };
-    return body;
-  } catch {
-    return { output: '', exitCode: null, timedOut: false, compileError: false, failure: 'Could not reach the server' };
-  }
-}
-
 function CollabEditor({ roomId, token, me, onSignOut }: { roomId: string; token: string; me: Me | null; onSignOut: () => void }) {
   const { doc, awareness } = useCollabDoc(roomId, token);
   const people = usePeople(awareness, me);
   const bindingRef = useRef<MonacoBinding | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [testsOpen, setTestsOpen] = useState(false);
   const language = useSharedLanguage(doc);
   const lang = LANGUAGES.find((l) => l.id === language) ?? LANGUAGES[0];
 
@@ -159,6 +138,7 @@ function CollabEditor({ roomId, token, me, onSignOut }: { roomId: string; token:
 
   async function handleRun() {
     setRunning(true);
+    setTestsOpen(false);
     setResult(await runCode(token, lang.id, doc.getText('content').toString()));
     setRunning(false);
   }
@@ -199,6 +179,9 @@ function CollabEditor({ roomId, token, me, onSignOut }: { roomId: string; token:
             </span>
           ))}
         </div>
+        <button className="editor-signout" onClick={() => { setResult(null); setTestsOpen((o) => !o); }}>
+          Tests
+        </button>
         <button className="editor-run" onClick={handleRun} disabled={running || !RUNNABLE.has(lang.id)}>
           {running ? 'Running...' : RUNNABLE.has(lang.id) ? 'Run' : 'Not runnable'}
         </button>
@@ -216,14 +199,42 @@ function CollabEditor({ roomId, token, me, onSignOut }: { roomId: string; token:
           options={{
             fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace",
             fontSize: 14,
+            fontLigatures: true,
             minimap: { enabled: false },
             padding: { top: 16 },
-            smoothScrolling: true,
-            cursorSmoothCaretAnimation: 'on',
+            scrollBeyondLastLine: false,
             renderLineHighlight: 'gutter',
+            // Typing behaviour you would expect from a desktop editor.
+            autoClosingBrackets: 'always',
+            autoClosingQuotes: 'always',
+            autoSurround: 'languageDefined',
+            autoIndent: 'full',
+            formatOnType: true,
+            formatOnPaste: true,
+            tabSize: 2,
+            detectIndentation: true,
+            quickSuggestions: { other: true, comments: false, strings: true },
+            suggestOnTriggerCharacters: true,
+            acceptSuggestionOnEnter: 'on',
+            tabCompletion: 'on',
+            snippetSuggestions: 'inline',
+            wordBasedSuggestions: 'allDocuments',
+            parameterHints: { enabled: true },
+            bracketPairColorization: { enabled: true },
+            guides: { bracketPairs: true, indentation: true },
+            matchBrackets: 'always',
+            occurrencesHighlight: 'singleFile',
+            cursorBlinking: 'smooth',
+            cursorSmoothCaretAnimation: 'off',
+            smoothScrolling: true,
+            mouseWheelZoom: true,
+            stickyScroll: { enabled: true },
+            linkedEditing: true,
+            renameOnType: true,
           }}
         />
       </div>
+      {testsOpen && <TestsPanel doc={doc} token={token} language={lang.id} onClose={() => setTestsOpen(false)} />}
       {result && (
         <section className="editor-output" aria-label="Output">
           <div className="editor-output-head">
