@@ -1,6 +1,0 @@
-{
-  "framework": "vite",
-  "installCommand": "bash scripts/vercel-install.sh",
-  "buildCommand": "npm run build -w @lemma/web",
-  "outputDirectory": "apps/web/dist"
-}
