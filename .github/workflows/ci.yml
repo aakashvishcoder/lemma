@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: devpass
+          POSTGRES_DB: lemma
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lemma"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:devpass@localhost:5432/lemma?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The generated Prisma client is gitignored, so a fresh checkout
+      # has to create it before anything can import it.
+      - name: Generate Prisma client and apply migrations
+        working-directory: apps/server
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      - run: npm run build --workspace=apps/web
+
+  docker:
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-only-secret
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check that the images still build
+        run: docker compose build
