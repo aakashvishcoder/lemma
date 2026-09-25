@@ -6,7 +6,7 @@ I built it to understand how real-time collaboration actually works under the ho
 
 ## Try it
 
-You need Docker. That's it.
+Use Docker to run all languages! The vercel application only works with JavaScript and Python as of current.
 
 ```bash
 cp .env.example .env     # then put a long random string in JWT_SECRET
