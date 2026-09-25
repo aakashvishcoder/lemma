@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import { API_BASE } from '../config';
 
-const API_BASE = 'http://localhost:3001';
 
 interface AuthContextValue {
   token: string | null;

@@ -3,13 +3,14 @@ import * as syncProtocol from 'y-protocols/sync';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
+import { WS_BASE } from '../config';
 
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
 const REMOTE_AWARENESS_ORIGIN = 'remote-awareness';
 
 export function connectYjsRoom(roomId: string, token: string, doc: Y.Doc, awareness: Awareness): () => void {
-  const ws = new WebSocket(`ws://localhost:3001?roomId=${roomId}&token=${token}`);
+  const ws = new WebSocket(`${WS_BASE}?roomId=${roomId}&token=${token}`);
   ws.binaryType = 'arraybuffer';
 
   // setLocalStateField() (called by y-monaco to publish cursor/selection)

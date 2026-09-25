@@ -1,54 +1,87 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from './AuthContext';
+import { Mark } from '../ui/Mark';
+import './auth.css';
+
+type Mode = 'sign-in' | 'register';
 
 export function AuthScreen() {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<Mode>('register');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const isRegister = mode === 'register';
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setBusy(true);
     try {
-      if (mode === 'login') {
-        await login(email, password);
-      } else {
+      if (isRegister) {
         await register(email, password, displayName);
+      } else {
+        await login(email, password);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
+      setBusy(false);
     }
   }
 
   return (
-    <div style={{ maxWidth: 320, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>{mode === 'login' ? 'Log in' : 'Register'}</h1>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        {mode === 'register' && (
+    <main className="auth">
+      <form className="auth-panel" onSubmit={handleSubmit}>
+        <Mark size={36} />
+        <h1>{isRegister ? 'Create an account' : 'Sign in'}</h1>
+        <p className="auth-lede">
+          {isRegister
+            ? 'You will join a shared room straight away. Open a second tab to see how it feels.'
+            : 'Welcome back. Your room is waiting.'}
+        </p>
+
+        <label>
+          Email
+          <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </label>
+
+        <label>
+          Password
           <input
-            placeholder="Display name"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
+            type="password"
+            autoComplete={isRegister ? 'new-password' : 'current-password'}
+            minLength={isRegister ? 8 : undefined}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
+          {isRegister && <span className="auth-hint">At least 8 characters.</span>}
+        </label>
+
+        {isRegister && (
+          <label>
+            Display name
+            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+          </label>
         )}
-        <button type="submit">{mode === 'login' ? 'Log in' : 'Register'}</button>
+
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <button className="auth-submit" type="submit" disabled={busy}>
+          {busy ? 'One moment...' : isRegister ? 'Create account' : 'Sign in'}
+        </button>
+
+        <button type="button" className="auth-switch" onClick={() => setMode(isRegister ? 'sign-in' : 'register')}>
+          {isRegister ? 'Already have an account? Sign in' : 'New here? Create an account'}
+        </button>
       </form>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
-        {mode === 'login' ? 'Need an account? Register' : 'Have an account? Log in'}
-      </button>
-    </div>
+    </main>
   );
 }
