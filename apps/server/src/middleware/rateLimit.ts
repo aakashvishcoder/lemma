@@ -2,16 +2,22 @@ import rateLimit from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import { redisPub } from '../redis/client';
 
-export const authRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many attempts, please try again later' },
-  store: new RedisStore({
-    sendCommand: (...args: string[]) => {
-      const [command, ...rest] = args;
-      return redisPub.call(command, ...rest) as Promise<string | number | boolean | (string | number | boolean)[]>;
-    },
-  }),
-});
+function limiter(windowMs: number, limit: number, message: string, prefix: string) {
+  return rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: message },
+    store: new RedisStore({
+      prefix,
+      sendCommand: (...args: string[]) => {
+        const [command, ...rest] = args;
+        return redisPub.call(command, ...rest) as Promise<string | number | boolean | (string | number | boolean)[]>;
+      },
+    }),
+  });
+}
+
+export const authRateLimit = limiter(15 * 60 * 1000, 10, 'Too many attempts, please try again later', 'rl:auth:');
+export const runRateLimit = limiter(60 * 1000, 20, 'Too many runs, wait a moment', 'rl:run:');
